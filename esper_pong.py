@@ -41,26 +41,32 @@ class InputMapperProcessor(esper.Processor):
                 if event.type == pygame.KEYDOWN:
                     action = self.lookup_binding(input.bindings, event.key)
                     if action is not None:
-                        event_queue += InputActionHappened(ent,action)
+                        input.actions.append(action)
+                if event.type == pygame.KEYUP:
+                    action = self.lookup_binding(input.bindings, event.key)
+                    if action is not None and action in input.actions:
+                        input.actions.remove(action)
 
     def lookup_binding(self, bindings, key, default=None):
         return bindings.get(pygame.key.name(key), default)
 
 class InputProcessor(esper.Processor):
     def process(self):
-        global event_queue
-        if event_queue.has_event(InputActionHappened):
-            e = event_queue.get_event(InputActionHappened)
-            for ent, (input, _, dir, vel) in world.get_components(Input, Paddle, Direction,Velocity):
-                if e.action == 'QUIT' and e.entity == ent: 
-                    pygame.quit()
-                    sys.exit()
-                elif e.action == 'PADDLE_UP' and e.entity == ent:
-                    dir.y = -1
-                elif e.action == 'PADDLE_DOWN' and e.entity == ent:
-                    dir.y = 1
-                else:
-                    dir.y = 0
+        for ent, (input, _, dir, vel) in world.get_components(Input, Paddle, Direction,Velocity):
+            if 'QUIT' in input.actions:
+                pygame.quit()
+            
+            if 'PADDLE_UP' in input.actions:
+                dir.y = -1
+            elif 'PADDLE_DOWN' in input.actions:
+                dir.y = 1
+            else:
+                dir.y = 0
+
+            if 'SPEED_UP' in input.actions:
+                vel.y = 10
+            if 'SPEED_DOWN' in input.actions:
+                vel.y = 5
 
 class PaddleMovementProcessor(esper.Processor):
     def process(self):
