@@ -1,8 +1,12 @@
 import pygame
 import esper
 import math
+import sys
 
 from components import *
+from event_queue import EventQueue
+from events import *
+
 
 FPS = 120
 SCREEN_WIDTH = 640
@@ -23,45 +27,40 @@ BINDINGS2 = {
 }
 
 
-def lookup_binding(bindings, key, default=None):
-    return bindings.get(pygame.key.name(key), default)
-
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
 game_font = pygame.font.SysFont('Comic Sans MS', 30)
 clock = pygame.time.Clock()
+event_queue = EventQueue()
 
 class InputMapperProcessor(esper.Processor):
     def process(self):
+        global event_queue
         for event in pygame.event.get():
             for ent, input in world.get_component(Input):
                 if event.type == pygame.KEYDOWN:
-                    action = lookup_binding(input.bindings, event.key)
+                    action = self.lookup_binding(input.bindings, event.key)
                     if action is not None:
-                        input.actions.append(action)
-                if event.type == pygame.KEYUP:
-                    action = lookup_binding(input.bindings, event.key)
-                    if action is not None and action in input.actions:
-                        input.actions.remove(action)
+                        event_queue += InputActionHappened(ent,action)
 
+    def lookup_binding(self, bindings, key, default=None):
+        return bindings.get(pygame.key.name(key), default)
 
 class InputProcessor(esper.Processor):
     def process(self):
-        for ent, (input, _, dir, vel) in world.get_components(Input, Paddle, Direction,Velocity):
-            if 'QUIT' in input.actions:
-                pygame.quit()
-            
-            if 'PADDLE_UP' in input.actions:
-                dir.y = -1
-            elif 'PADDLE_DOWN' in input.actions:
-                dir.y = 1
-            else:
-                dir.y = 0
-
-            if 'SPEED_UP' in input.actions:
-                vel.y = 10
-            if 'SPEED_DOWN' in input.actions:
-                vel.y = 5
+        global event_queue
+        if event_queue.has_event(InputActionHappened):
+            e = event_queue.get_event(InputActionHappened)
+            for ent, (input, _, dir, vel) in world.get_components(Input, Paddle, Direction,Velocity):
+                if e.action == 'QUIT' and e.entity == ent: 
+                    pygame.quit()
+                    sys.exit()
+                elif e.action == 'PADDLE_UP' and e.entity == ent:
+                    dir.y = -1
+                elif e.action == 'PADDLE_DOWN' and e.entity == ent:
+                    dir.y = 1
+                else:
+                    dir.y = 0
 
 class PaddleMovementProcessor(esper.Processor):
     def process(self):
@@ -145,6 +144,7 @@ paddle2 = create_paddle(Input(BINDINGS2),None, SCREEN_WIDTH-40,SCREEN_HEIGHT/2, 
 ball = world.create_entity(Ball(),Position(BALL_SPAWN_POINT[0],BALL_SPAWN_POINT[1]), HitBox(5,5), Direction(1,1), Velocity(BALL_INIT_VEL[0],BALL_INIT_VEL[1]), Drawable("circle", 5,10, (255,255,255)))
 
 while True:
+    event_queue.clear()
     world.process()
     pygame.display.update()
     clock.tick(FPS)
