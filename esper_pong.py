@@ -14,8 +14,7 @@ BALL_INIT_VEL = (-50,0)
 BINDINGS = {
     'w' : 'PADDLE_UP',
     's' : 'PADDLE_DOWN',
-    '1' : 'SPEED_UP',
-    '2' : 'SPEED_DOWN'
+    'escape' : 'QUIT'
 }
 
 BINDINGS2 = {
@@ -49,6 +48,9 @@ class InputMapperProcessor(esper.Processor):
 class InputProcessor(esper.Processor):
     def process(self):
         for ent, (input, _, dir, vel) in world.get_components(Input, Paddle, Direction,Velocity):
+            if 'QUIT' in input.actions:
+                pygame.quit()
+            
             if 'PADDLE_UP' in input.actions:
                 dir.y = -1
             elif 'PADDLE_DOWN' in input.actions:
