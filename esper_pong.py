@@ -79,36 +79,42 @@ class BallOutOfBoundsProcessor(esper.Processor):
     def process(self):
         for ent, (_, pos,vel,dir) in world.get_components(Ball, Position, Velocity,Direction):
             if pos.x < 0 or pos.x > SCREEN_WIDTH:
-                pos.x = BALL_SPAWN_POINT[0]
-                pos.y = BALL_SPAWN_POINT[1]
-                vel.x = BALL_INIT_VEL[0]
-                vel.y = BALL_INIT_VEL[1]
-                dir.x *= -1
+                global event_queue
+                event_queue += BallOutOfBounds(ent)
+
 
                 for coll in world.try_component(ent, Collided):
                     world.component_for_entity(coll.entity, Score).points += 1
                     world.remove_component(ent, Collided)
 
+class SpawnBallProcessor(esper.Processor):
+    global event_queue
+    def process(self):
+        if event_queue.has_event(BallOutOfBounds):
+            e = event_queue.get_event(BallOutOfBounds)
+            world.delete_entity(e.collider)
+
+            world.create_entity(Ball(),Position(BALL_SPAWN_POINT[0],BALL_SPAWN_POINT[1]), HitBox(5,5), Direction(1,1), Velocity(BALL_INIT_VEL[0],BALL_INIT_VEL[1]), Drawable("circle", 5,10, (255,255,255)))
 
 class BallCollisionProcessor(esper.Processor):
-        def process(self):
-            for ent, (_, pos, dir, vel, box) in world.get_components(Ball, Position, Direction, Velocity, HitBox):
-                if pos.y < 0 or pos.y > SCREEN_HEIGHT:
-                    vel.y *= -1
-                for ent2, (_, p_pos, p_box) in world.get_components(Paddle, Position, HitBox):
-                    if self.overlaps(pos,box, p_pos, p_box):
-                        paddleCenter = p_pos.y + (p_box.height/2)
-                        d = paddleCenter - pos.y
-                        vel.y += d * -0.5
-                        dir.x *= -1
+    def process(self):
+        for ent, (_, pos, dir, vel, box) in world.get_components(Ball, Position, Direction, Velocity, HitBox):
+            if pos.y < 0 or pos.y > SCREEN_HEIGHT:
+                vel.y *= -1
+            for ent2, (_, p_pos, p_box) in world.get_components(Paddle, Position, HitBox):
+                if self.overlaps(pos,box, p_pos, p_box):
+                    paddleCenter = p_pos.y + (p_box.height/2)
+                    d = paddleCenter - pos.y
+                    vel.y += d * -0.5
+                    dir.x *= -1
 
-                        if world.has_component(ent, Collided):
-                            world.component_for_entity(ent,Collided).entity = ent2
-                        else:
-                            world.add_component(ent,Collided(ent2))
-        
-        def overlaps(self, ball_pos, ball_box, paddle_pos, paddle_box):
-            return ball_pos.x >= paddle_pos.x and ball_pos.x <= paddle_pos.x + paddle_box.width and ball_pos.y >= paddle_pos.y and ball_pos.y <= paddle_pos.y + paddle_box.height
+                    if world.has_component(ent, Collided):
+                        world.component_for_entity(ent,Collided).entity = ent2
+                    else:
+                        world.add_component(ent,Collided(ent2))
+    
+    def overlaps(self, ball_pos, ball_box, paddle_pos, paddle_box):
+        return ball_pos.x >= paddle_pos.x and ball_pos.x <= paddle_pos.x + paddle_box.width and ball_pos.y >= paddle_pos.y and ball_pos.y <= paddle_pos.y + paddle_box.height
 
 class DrawScreenProcessor(esper.Processor):
     def process(self):
@@ -134,6 +140,7 @@ world.add_processor(BallMovementProcessor())
 world.add_processor(BallCollisionProcessor())
 world.add_processor(BallOutOfBoundsProcessor())
 world.add_processor(DrawScoreProcessor())
+world.add_processor(SpawnBallProcessor())
 
 
 def create_paddle(input, velocity, x,y,width,height,color):
