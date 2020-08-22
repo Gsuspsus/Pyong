@@ -37,3 +37,11 @@ class Input:
     def __init__(self, bindings):
         self.bindings = bindings
         self.actions = []
+
+class Collided:
+    def __init__(self, entity):
+        self.entity = entity
+
+class Score:
+    def __init__(self):
+        self.points = 0

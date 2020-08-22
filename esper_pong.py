@@ -29,7 +29,7 @@ def lookup_binding(bindings, key, default=None):
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-myfont = pygame.font.SysFont('Comic Sans MS', 30)
+game_font = pygame.font.SysFont('Comic Sans MS', 30)
 clock = pygame.time.Clock()
 
 class InputMapperProcessor(esper.Processor):
@@ -82,7 +82,11 @@ class BallOutOfBoundsProcessor(esper.Processor):
                 pos.y = BALL_SPAWN_POINT[1]
                 vel.x = BALL_INIT_VEL[0]
                 vel.y = BALL_INIT_VEL[1]
-                dir.x *= -1 
+                dir.x *= -1
+
+                for coll in world.try_component(ent, Collided):
+                    world.component_for_entity(coll.entity, Score).points += 1
+                    world.remove_component(ent, Collided)
 
 
 class BallCollisionProcessor(esper.Processor):
@@ -96,6 +100,11 @@ class BallCollisionProcessor(esper.Processor):
                         d = paddleCenter - pos.y
                         vel.y += d * -0.5
                         dir.x *= -1
+
+                        if world.has_component(ent, Collided):
+                            world.component_for_entity(ent,Collided).entity = ent2
+                        else:
+                            world.add_component(ent,Collided(ent2))
         
         def overlaps(self, ball_pos, ball_box, paddle_pos, paddle_box):
             return ball_pos.x >= paddle_pos.x and ball_pos.x <= paddle_pos.x + paddle_box.width and ball_pos.y >= paddle_pos.y and ball_pos.y <= paddle_pos.y + paddle_box.height
@@ -109,6 +118,12 @@ class DrawScreenProcessor(esper.Processor):
             elif draw.shape == "circle":
                 pygame.draw.circle(screen, draw.color, (int(pos.x),int(pos.y)), draw.width, 0)
 
+class DrawScoreProcessor(esper.Processor):
+    def process(self):
+        for ent, (pos, score) in world.get_components(Position, Score):
+            textsurface = game_font.render(str(score.points), False, (255,255,255))
+            screen.blit(textsurface, (pos.x,textsurface.get_height()))
+
 world = esper.World()
 world.add_processor(InputMapperProcessor(), priority=1)
 world.add_processor(InputProcessor())
@@ -117,9 +132,11 @@ world.add_processor(DrawScreenProcessor())
 world.add_processor(BallMovementProcessor())
 world.add_processor(BallCollisionProcessor())
 world.add_processor(BallOutOfBoundsProcessor())
+world.add_processor(DrawScoreProcessor())
+
 
 def create_paddle(input, velocity, x,y,width,height,color):
-    return world.create_entity(input, Position(x,y-height/2), Paddle(), Drawable("rect", width, height, color), Direction(0,0),Velocity(0,3), HitBox(width,height))
+    return world.create_entity(input, Position(x,y-height/2), Paddle(), Score(), Drawable("rect", width, height, color), Direction(0,0),Velocity(0,3), HitBox(width,height))
 
 paddle = create_paddle(Input(BINDINGS),None, 20, SCREEN_HEIGHT/2, 20,80, (255,255,255))
 paddle2 = create_paddle(Input(BINDINGS2),None, SCREEN_WIDTH-40,SCREEN_HEIGHT/2, 20,80, (255,255,255))
